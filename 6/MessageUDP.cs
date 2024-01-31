@@ -22,7 +22,8 @@ namespace _6
         public string FromName { get; set; }
         public string ToName { get; set; }
         public string Text { get; set; }
-        public List<string> UnreadMessages { get; set; }
+        public DateTime DateTime { get; set; }
+       
 
         // Метод для сериализации в JSON
         public string ToJson()
@@ -34,6 +35,11 @@ namespace _6
         public static MessageUDP FromJson(string json)
         {
             return JsonSerializer.Deserialize<MessageUDP>(json);
+        }
+
+        public override string ToString()
+        {
+            return $"{DateTime} \n Получено сообщение {Text} \n от {FromName}  ";
         }
     }
 }

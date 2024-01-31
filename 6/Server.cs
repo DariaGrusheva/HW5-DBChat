@@ -6,32 +6,40 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using _6.Abstractions;
+using System.Xml.Linq;
 
 namespace _6
 {
     public class Server
     {
         private readonly Dictionary<string, IPEndPoint> clients = new Dictionary<string, IPEndPoint>();
-        private UdpClient udpClient;
+        //private UdpClient udpClient;
+        private readonly IMessageSource _messageSource;//
+        //private readonly IPEndPoint _endPoint;//
 
-        public void Register(MessageUDP message, IPEndPoint fromep)
+        public Server (IMessageSource messageSource)
         {
-            Console.WriteLine("Message Register, name = " + message.FromName);
-            clients.Add(message.FromName, fromep);
+            _messageSource = messageSource;
+        }
+        public void Register(MessageUDP message, IPEndPoint fromep)// регистрация сообщений
+        {
+            Console.WriteLine("Сообщение зарегистрировано, от = " + message.FromName);
+            clients.Add(message.FromName, fromep);// добавили в словарь имя и ип
 
-            using (var ctx = new Context())
+            using (var ctx = new Context())// добавляем в БД
             {
                 if (ctx.Users.FirstOrDefault(x => x.Name == message.FromName) != null) return;
 
-                ctx.Add(new User { Name = message.FromName });
+                ctx.Add(new User { Name = message.FromName }); //добавили
 
-                ctx.SaveChanges();
+                ctx.SaveChanges();// сохранили
             }
         }
 
-        public void ConfirmMessageReceived(int? id)
+        public void ConfirmMessageReceived(int? id)// подтверждение получения сообщения
         {
-            Console.WriteLine("Message confirmation id=" + id);
+            Console.WriteLine("Подтверждение сообщения id=" + id);
 
             using (var ctx = new Context())
             {
@@ -45,7 +53,7 @@ namespace _6
             }
         }
 
-        public void RelayMessage(MessageUDP message)
+        public void RelayMessage(MessageUDP message) //поиск клиента и передача сообщение
         {
             int? id = null;
             if (clients.TryGetValue(message.ToName, out IPEndPoint ep))
@@ -55,19 +63,26 @@ namespace _6
                     var fromUser = ctx.Users.First(x => x.Name == message.FromName);
                     var toUser = ctx.Users.First(x => x.Name == message.ToName);
                     var msg = new Message { FromUser = fromUser, ToUser = toUser, Received = false, Text = message.Text };
-                    ctx.Messages.Add(msg);
+                    ctx.Messages.Add(msg); // сформировали сообщение и добавили в таблицу Messages
 
                     ctx.SaveChanges();
 
                     id = msg.Id;
                 }
 
-                var forwardMessageJson = new MessageUDP { Id = id, Command = Command.Message, ToName = message.ToName, FromName = message.FromName, Text = message.Text }.ToJson();
+                //var forwardMessageJson = new MessageUDP { Id = id, Command = Command.Message, ToName = message.ToName, FromName = message.FromName, Text = message.Text }.ToJson();
+                //byte[] forwardBytes = Encoding.ASCII.GetBytes(forwardMessageJson);
+                //udpClient.Send(forwardBytes, forwardBytes.Length, ep);
 
-                byte[] forwardBytes = Encoding.ASCII.GetBytes(forwardMessageJson);
+                var forwardMessage = new MessageUDP { Id = id, 
+                    Command = Command.Message, 
+                    ToName = message.ToName, 
+                    FromName = message.FromName, 
+                    Text = message.Text };
+                _messageSource.SendMessage(forwardMessage, ep);
 
-                udpClient.Send(forwardBytes, forwardBytes.Length, ep);
-                Console.WriteLine($"Message Relayed, from = {message.FromName} to = {message.ToName}");
+
+                Console.WriteLine($"Передано сообщение, от = {message.FromName} для = {message.ToName}");
             }
             else
             {
@@ -75,28 +90,28 @@ namespace _6
             }
         }
 
-        public void ProcessMessage(MessageUDP message, IPEndPoint fromep)
+        public void ProcessMessage(MessageUDP message, IPEndPoint fromep) // процессное сообщение
         {
             Console.WriteLine($"Получено сообщение от {message.FromName} для {message.ToName} с командой {message.Command}:");
             Console.WriteLine(message.Text);
 
-            if (message.Command == Command.Register)
+            if (message.Command == Command.Register)// если регистр
             {
-                Register(message, fromep);
+                Register(message, fromep);// арегистрировали
             }
             else if (message.Command == Command.Confirmation)
             {
-                Console.WriteLine("Confirmation receiver");
+                Console.WriteLine("Получатель подтверден");//????
                 ConfirmMessageReceived(message.Id);
             }
             else if (message.Command == Command.Message)
             {
-                RelayMessage(message);
+                RelayMessage(message);// поиск клиента и отправка
             }
         }
 
 
-        void GetUnreadMessages(string userName)
+        void GetUnreadMessages(string userName) //получать нечитаемые сообщения
         {
             if (clients.TryGetValue(userName, out IPEndPoint ep))
             {
@@ -105,18 +120,21 @@ namespace _6
                     var user = ctx.Users.FirstOrDefault(x => x.Name == userName);
                     if (user != null)
                     {
-                        var unreadMessages = user.ToMessages.Where(msg => !msg.Received).Select(msg => msg.Text).ToList();
+                        var unreadMessages = user.ToMessages.Where(msg => !msg.Received).Select(msg => msg.Text).ToList();//???
 
                         var unreadMessagesJson = new MessageUDP
                         {
                             Command = Command.GetUnreadMessages,
                             FromName = "Server",
-                            UnreadMessages = unreadMessages
+                            //UnreadMessages = unreadMessages ??????????
                         };
 
-                        byte[] unreadBytes = Encoding.ASCII.GetBytes(unreadMessagesJson.ToJson());
-                        udpClient.Send(unreadBytes, unreadBytes.Length, ep);
-                        Console.WriteLine($"Unread messages sent to {userName}");
+                        /*byte[] unreadBytes = Encoding.ASCII.GetBytes(unreadMessagesJson.ToJson());
+                        udpClient.Send(unreadBytes, unreadBytes.Length, ep);*/
+
+                        _messageSource.SendMessage(unreadMessagesJson, ep);//
+
+                        Console.WriteLine($"Непрочитанное сообщение отправлено {userName}");
                     }
                 }
             }
@@ -132,22 +150,27 @@ namespace _6
         {
             IPEndPoint remoteEndPoint;
 
-            udpClient = new UdpClient(5430);
+            //udpClient = new UdpClient(5430);
             remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
-            Console.WriteLine("UDP Клиент ожидает сообщений...");
+            Console.WriteLine("Клиент ожидает сообщений...");
 
             while (true)
             {
                 Console.WriteLine("Ожидание сообщения...");
-                byte[] receiveBytes = udpClient.Receive(ref remoteEndPoint);
-                string receivedData = Encoding.ASCII.GetString(receiveBytes);
 
-                Console.WriteLine(receivedData);
+                //byte[] receiveBytes = udpClient.Receive(ref remoteEndPoint);
+                //string receivedData = Encoding.ASCII.GetString(receiveBytes);
+                //Console.WriteLine(receivedData);
+
+                MessageUDP message = _messageSource.ReceiveMessage(ref remoteEndPoint);//
+                Console.WriteLine(message.ToString());
+                
 
                 try
                 {
-                    var message = MessageUDP.FromJson(receivedData);
+                    //var message = MessageUDP.FromJson(receivedData);
+
 
                     ProcessMessage(message, remoteEndPoint);
                 }

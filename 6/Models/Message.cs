@@ -15,6 +15,5 @@ namespace _6.Models
         public int? FromUserId { get; set; }
         public virtual User? ToUser { get; set; }
         public virtual User? FromUser { get; set; }
-        public List<string>? UnreadMessages { get; set; } // Список непрочитанных сообщений
     }
 }

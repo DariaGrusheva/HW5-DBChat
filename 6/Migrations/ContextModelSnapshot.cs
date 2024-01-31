@@ -38,7 +38,7 @@ namespace _6.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("from_user_id");
 
-                    b.Property<bool>("Reseived")
+                    b.Property<bool>("Received")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Text")
@@ -57,7 +57,7 @@ namespace _6.Migrations
 
                     b.HasIndex("ToUserId");
 
-                    b.ToTable("Messages", (string)null);
+                    b.ToTable("messages", (string)null);
                 });
 
             modelBuilder.Entity("_6.Models.User", b =>
@@ -78,7 +78,7 @@ namespace _6.Migrations
                     b.HasKey("Id")
                         .HasName("user_pkey");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("users", (string)null);
                 });
 
             modelBuilder.Entity("_6.Models.Message", b =>

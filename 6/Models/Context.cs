@@ -11,11 +11,14 @@ namespace _6.Models
     {
         public virtual DbSet<User> Users { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
-        public Context() { }
+        public Context() 
+        { 
+            //Database.EnsureCreated();
+        }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.LogTo(Console.WriteLine).UseLazyLoadingProxies().UseNpgsql("Host=localhost;Username=postgres;Password=example;Database=ChatDB");
+            optionsBuilder.LogTo(Console.WriteLine).UseLazyLoadingProxies().UseNpgsql("Host=localhost;Port=5432;Username=postgres;Password=example;Database=chat_db");
         }
 
 
@@ -24,7 +27,7 @@ namespace _6.Models
             modelBuilder.Entity<Message>(entity => {
 
                 entity.HasKey(x => x.Id).HasName("message_pkey");
-                entity.ToTable("Messages");
+                entity.ToTable("messages");
                 entity.Property(x => x.Id).HasColumnName("id");
                 entity.Property(x => x.Text).HasColumnName("text");
                 entity.Property(e => e.FromUserId).HasColumnName("from_user_id");
@@ -38,7 +41,7 @@ namespace _6.Models
             modelBuilder.Entity<User>(entity => {
 
                 entity.HasKey(x => x.Id).HasName("user_pkey");
-                entity.ToTable("Users");
+                entity.ToTable("users");
                 entity.Property(x => x.Id).HasColumnName("id");
                 entity.Property(x => x.Name).HasMaxLength(255).HasColumnName("name");
 
